@@ -192,8 +192,8 @@ class DisplayHandler(BaseHTTPRequestHandler):
         if self.path not in ("/", "/index.html"):
             self.send_response(404); self.end_headers(); return
 
-        from datetime import datetime
-        now = datetime.now().strftime("%H:%M:%S")
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone(timedelta(hours=8))).strftime("%H:%M:%S")
         cache = load_cache()
         data_time = cache.get("updated_at", "—") if cache else "—"
 
@@ -217,8 +217,8 @@ class DisplayHandler(BaseHTTPRequestHandler):
                 self.send_response(403); self.end_headers(); return
             try:
                 payload = json.loads(body)
-                from datetime import datetime
-                payload["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                from datetime import datetime, timezone, timedelta
+                payload["updated_at"] = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
                 DATA_FILE.write_text(json.dumps(payload, ensure_ascii=False))
                 self._json({"ok": True})
             except Exception as e:
@@ -254,12 +254,12 @@ class DisplayHandler(BaseHTTPRequestHandler):
                             status_obj = json.loads(status_json[start:end])
                         else:
                             status_obj = json.loads(status_json)
-                        from datetime import datetime
+                        from datetime import datetime, timezone, timedelta
                         payload = {
                             "status": status_obj,
                             "chronicle": args.get("chronicle", ""),
                             "locked_count": args.get("locked_count", 0),
-                            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            "updated_at": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
                         }
                         DATA_FILE.write_text(json.dumps(payload, ensure_ascii=False))
                         self._json({"jsonrpc": "2.0", "id": req_id, "result": {
