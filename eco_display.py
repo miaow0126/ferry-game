@@ -41,6 +41,31 @@ MCP_TOOLS = [
     }
 ]
 
+def _extract_json(raw: str) -> dict:
+    """从可能含有前缀文字的字符串中提取 JSON 对象，用括号配对而非 rfind。"""
+    raw = raw.strip()
+    # 先直接尝试
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # 找第一个 { 并配对到对应的 }
+    start = raw.find("{")
+    if start != -1:
+        depth = 0
+        for i, ch in enumerate(raw[start:], start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(raw[start:i + 1])
+                    except json.JSONDecodeError:
+                        break
+    raise ValueError(f"无法从输入中提取 JSON（长度={len(raw)}，前80字符：{raw[:80]!r}）")
+
+
 SEASON_CONFIG = {
     "春": {"emoji": "🌸", "color": "#a8d8a8", "bg": "#1a2e1a"},
     "夏": {"emoji": "🌿", "color": "#4db88a", "bg": "#0d2318"},
@@ -85,14 +110,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .pop-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 24px; }}
   .pop-card {{ background: #0f180f; border: 1px solid #1e2e1e; border-radius: 8px; padding: 12px 14px; }}
   .pop-name {{ font-size: .85rem; color: #a8c8a0; margin-bottom: 4px; }}
-  .pop-count {{ font-size: 1.3rem; font-weight: 700; color: {accent}; }}
+  .pop-count {{ font-size: 1.3rem; font-weight: 700; color: #a8c8a0; }}
   .pop-delta {{ font-size: .75rem; margin-top: 2px; }}
   .pop-delta.up {{ color: #4db86a; }}
   .pop-delta.down {{ color: #c06050; }}
   .pop-locked {{ font-size: .85rem; color: #3a4a3a; font-style: italic; }}
   .chronicle-box {{ background: #0f180f; border: 1px solid #1e2e1e; border-radius: 10px; padding: 18px 20px; margin-bottom: 24px; white-space: pre-wrap; font-size: .85rem; line-height: 1.8; color: #8aa888; min-height: 80px; }}
   .settler-list {{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }}
-  .settler-chip {{ background: #1a2e1a; border: 1px solid {accent}44; border-radius: 20px; padding: 5px 14px; font-size: .82rem; color: {accent}; }}
+  .settler-chip {{ background: #1a2e1a; border: 1px solid #a8c8a044; border-radius: 20px; padding: 5px 14px; font-size: .82rem; color: #a8c8a0; }}
   .no-settler {{ color: #3a4a3a; font-size: .85rem; }}
   .no-data {{ text-align: center; padding: 80px 20px; color: #3a4a3a; }}
   .no-data .icon {{ font-size: 3rem; margin-bottom: 16px; }}
@@ -257,13 +282,7 @@ class DisplayHandler(BaseHTTPRequestHandler):
                     args = params.get("arguments", {})
                     try:
                         status_json = args.get("status_json", "{}")
-                        # 提取花括号 JSON
-                        start = status_json.rfind("{")
-                        end = status_json.rfind("}") + 1
-                        if start != -1:
-                            status_obj = json.loads(status_json[start:end])
-                        else:
-                            status_obj = json.loads(status_json)
+                        status_obj = _extract_json(status_json)
                         from datetime import datetime, timezone, timedelta
                         payload = {
                             "status": status_obj,
