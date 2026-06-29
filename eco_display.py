@@ -170,7 +170,16 @@ def build_body(cache):
         pop_cards += f'<div class="pop-card"><div class="pop-locked">??? ×{locked_count}</div><div class="pop-count" style="color:#3a4a3a">—</div></div>'
     pop_section = f'<div class="section-title">种群</div><div class="pop-grid">{pop_cards}</div>'
 
-    settler_html = "".join(f'<div class="settler-chip">{s}</div>' for s in settlers) if settlers else '<span class="no-settler">暂无定居者</span>'
+    def fmt_settler(s):
+        if isinstance(s, dict):
+            name = s.get("nickname") or s.get("name", "?")
+            species = s.get("name", "")
+            label = f"{name}（{species}）" if s.get("nickname") and species != name else name
+            health = s.get("health", 1.0)
+            age = s.get("age", 0)
+            return f'<div class="settler-chip">{label} · {age}天 · ❤️{int(health*100)}%</div>'
+        return f'<div class="settler-chip">{s}</div>'
+    settler_html = "".join(fmt_settler(s) for s in settlers) if settlers else '<span class="no-settler">暂无定居者</span>'
     settler_section = f'<div class="section-title">定居者</div><div class="settler-list">{settler_html}</div>'
 
     chron = "\n".join(l for l in (chronicle_text or "").splitlines() if not l.startswith("📜")).strip() or "年鉴还是空白的一页。"
