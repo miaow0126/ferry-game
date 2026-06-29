@@ -177,7 +177,8 @@ def build_body(cache):
             label = f"{name}（{species}）" if s.get("nickname") and species != name else name
             health = s.get("health", 1.0)
             age = s.get("age", 0)
-            return f'<div class="settler-chip">{label} · {age}天 · ❤️{int(health*100)}%</div>'
+            juvenile = "·幼" if s.get("juvenile") else ""
+            return f'<div class="settler-chip">{label}{juvenile} · {age}天 · ❤️{int(health*100)}%</div>'
         return f'<div class="settler-chip">{s}</div>'
     settler_html = "".join(fmt_settler(s) for s in settlers) if settlers else '<span class="no-settler">暂无定居者</span>'
     settler_section = f'<div class="section-title">定居者</div><div class="settler-list">{settler_html}</div>'
