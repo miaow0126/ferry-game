@@ -130,7 +130,7 @@ def build_body(cache):
 
     season = data.get("season", "春")
     day = data.get("day", 0)
-    year = data.get("year", day // 365 + 1)
+    year = data.get("year", day // 120 + 1)
     score = data.get("pond_score", 0)
     pop = data.get("pop", {})
     delta = data.get("delta", {})
