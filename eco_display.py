@@ -18,7 +18,7 @@ UPDATE_TOKEN = os.environ.get("UPDATE_TOKEN", "guiwan-eco-2026")
 MCP_TOOLS = [
     {
         "name": "push_eco_data",
-        "description": "把瓶中生态的最新状态推送到桂晚的展示台。玩完 eco 游戏后调用。",
+        "description": "把瓶中生态的最新状态推送到桂晚的展示台。每次玩完 eco 游戏后调用。调用前必须先获取两项数据：①调用 eco_info action=status 获取 status_json（取返回文本末尾花括号包裹的 JSON 字符串）；②调用 eco_info action=chronicle scope=all 获取完整年鉴文本。然后把这两项作为参数传入本工具。",
         "inputSchema": {
             "type": "object",
             "properties": {
