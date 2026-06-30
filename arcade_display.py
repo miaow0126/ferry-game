@@ -87,6 +87,14 @@ def all_prizes(cache):
     arc = cache.get("arcade", {})
     return arc.get("owned", []) + arc.get("decor", [])
 
+GAME_KEYS = {
+    "slots":     ("spins",   "wagered", "won"),
+    "blackjack": ("hands",   "wagered", "won"),
+    "roulette":  ("spins",   "wagered", "won"),
+}
+GAME_LABEL = {"slots": "🎰 老虎机", "blackjack": "🃏 二十一点", "roulette": "🎡 轮盘"}
+
+
 def update_history(cache, hist):
     arc = cache.get("arcade", {})
     ts  = now_str()
@@ -97,6 +105,25 @@ def update_history(cache, hist):
     if curr_w > prev_w:
         hist["cumulative_winnings"] = hist.get("cumulative_winnings", 0) + (curr_w - prev_w)
     hist["prev_winnings"] = curr_w
+
+    # game ledger: detect deltas per game
+    prev_games = hist.get("prev_games", {})
+    for game, (cnt_key, wag_key, won_key) in GAME_KEYS.items():
+        curr_g = cache.get(game, {})
+        prev_g = prev_games.get(game, {})
+        d_cnt = curr_g.get(cnt_key, 0) - prev_g.get(cnt_key, 0)
+        d_wag = curr_g.get(wag_key, 0) - prev_g.get(wag_key, 0)
+        d_won = curr_g.get(won_key, 0) - prev_g.get(won_key, 0)
+        if d_cnt > 0 and d_wag > 0:
+            hist.setdefault("game_events", []).append({
+                "game": game, "count": d_cnt,
+                "wagered": d_wag, "won": d_won, "net": d_won - d_wag,
+                "at": ts,
+            })
+        prev_games[game] = {cnt_key: curr_g.get(cnt_key, 0),
+                            wag_key: curr_g.get(wag_key, 0),
+                            won_key: curr_g.get(won_key, 0)}
+    hist["prev_games"] = prev_games
 
     # prize events
     curr_prizes = all_prizes(cache)
@@ -234,6 +261,7 @@ def build_body(cache, hist):
     arc   = cache.get("arcade", {})
     slots = cache.get("slots", {})
     bj    = cache.get("blackjack", {})
+    rl    = cache.get("roulette", {})
     log   = cache.get("log", "")
 
     chips        = arc.get("chips", 0)
@@ -287,6 +315,32 @@ def build_body(cache, hist):
 </table>
 </div>"""
 
+    # ── 游戏流水账 ──
+    game_events = hist.get("game_events", [])
+    g_rows = ""
+    for ev in sorted(game_events, key=lambda x: x["at"], reverse=True)[:50]:
+        net = ev["net"]
+        net_col = "#4db86a" if net >= 0 else "#c06050"
+        net_str = f'{"+"+str(net) if net>=0 else str(net)}'
+        cnt_str = f'×{ev["count"]}' if ev.get("count", 1) > 1 else ""
+        g_rows += f"""<tr>
+  <td>{GAME_LABEL.get(ev['game'], ev['game'])} {cnt_str}</td>
+  <td style="color:#a08060">-{ev['wagered']}</td>
+  <td style="color:#a08060">+{ev['won']}</td>
+  <td style="color:{net_col}">{net_str}</td>
+  <td>{ev['at'][5:16]}</td>
+</tr>"""
+    if not g_rows:
+        g_rows = '<tr><td colspan="5" style="text-align:center;color:#604830;padding:16px">还没有游戏记录</td></tr>'
+
+    game_ledger = f"""<div class="section-title">游戏流水账</div>
+<div class="ledger-wrap" style="margin-bottom:24px">
+<table class="ledger-table">
+<thead><tr><th>游戏</th><th>下注</th><th>赢取</th><th>净盈亏</th><th>时间</th></tr></thead>
+<tbody>{g_rows}</tbody>
+</table>
+</div>"""
+
     # ── games ──
     s_spins    = slots.get("spins", 0)
     s_wagered  = slots.get("wagered", 0)
@@ -330,7 +384,12 @@ def build_body(cache, hist):
   </div>
   <div class="game-card">
     <div class="game-name">🎡 轮盘</div>
-    <div class="game-stat"><span>数据</span><span>推进中…</span></div>
+    <div class="game-stat"><span>转轮次数</span><span>{rl.get('spins',0)}</span></div>
+    <div class="game-stat"><span>总下注</span><span>{rl.get('wagered',0)}</span></div>
+    <div class="game-stat"><span>总赢取</span><span>{rl.get('won',0)}</span></div>
+    <div class="game-stat"><span>净盈亏</span><span style="color:{'#4db86a' if rl.get('won',0)-rl.get('wagered',0)>=0 else '#c06050'}">{'+' if rl.get('won',0)-rl.get('wagered',0)>=0 else ''}{rl.get('won',0)-rl.get('wagered',0)}</span></div>
+    <div class="game-stat"><span>最大单次</span><span>{rl.get('biggest',0)}</span></div>
+    <div class="game-stat"><span>连胜</span><span>🔥 {rl.get('streak',0)}</span></div>
   </div>
 </div>"""
 
@@ -383,7 +442,7 @@ def build_body(cache, hist):
     # ── log ──
     log_section = f'<div class="section-title">最近记录</div><div class="log-box">{log or "暂无记录"}</div>'
 
-    return top + accounting + games + prizes_section + catalog_section + log_section
+    return top + accounting + game_ledger + games + prizes_section + catalog_section + log_section
 
 
 # ── server ────────────────────────────────────────────────────────────────────

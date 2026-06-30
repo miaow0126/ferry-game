@@ -71,6 +71,16 @@ def load_blackjack_save() -> dict:
     return {}
 
 
+def load_roulette_save() -> dict:
+    save = GAME_DIR / "roulette_save.json"
+    if save.exists():
+        try:
+            return json.loads(save.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
 def push_to_display(last_log: str = ""):
     try:
         payload = {
@@ -78,6 +88,7 @@ def push_to_display(last_log: str = ""):
             "arcade": load_save(),
             "slots": load_slots_save(),
             "blackjack": load_blackjack_save(),
+            "roulette": load_roulette_save(),
             "log": last_log,
         }
         body = json.dumps(payload, ensure_ascii=False).encode()
