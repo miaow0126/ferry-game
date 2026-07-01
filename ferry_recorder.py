@@ -109,26 +109,51 @@ def forward_to_upstream(tool_name: str, tool_args: dict) -> str:
         "params": {"name": tool_name, "arguments": tool_args}
     }
     body = json.dumps(upstream_req).encode()
-    try:
-        req = urllib.request.Request(
-            UPSTREAM,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            resp_data = json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        resp_data = json.loads(e.read())
-    except Exception as e:
-        return f"[错误] {e}"
+    # 尝试 /mcp 路径（streamable-http 上游），失败则回退到根路径
+    for url in [UPSTREAM.rstrip("/") + "/mcp", UPSTREAM]:
+        try:
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                raw = resp.read()
+                # SSE 格式：data: {...}\n\n
+                text = raw.decode("utf-8", errors="replace")
+                if text.startswith("data:"):
+                    for line in text.splitlines():
+                        if line.startswith("data:"):
+                            try:
+                                resp_data = json.loads(line[5:].strip())
+                                break
+                            except Exception:
+                                pass
+                    else:
+                        return text
+                else:
+                    resp_data = json.loads(text)
+        except urllib.error.HTTPError as e:
+            try:
+                resp_data = json.loads(e.read())
+            except Exception:
+                continue
+        except Exception as e:
+            if url == UPSTREAM:
+                return f"[错误] {e}"
+            continue
 
-    if "result" in resp_data:
-        content = resp_data["result"].get("content", [])
-        return "\n".join(c.get("text", "") for c in content if c.get("type") == "text")
-    elif "error" in resp_data:
-        return f"[错误] {resp_data['error']}"
-    return ""
+        if "result" in resp_data:
+            content = resp_data["result"].get("content", [])
+            return "\n".join(c.get("text", "") for c in content if c.get("type") == "text")
+        elif "error" in resp_data:
+            return f"[错误] {resp_data['error']}"
+        return ""
+    return "[错误] 无法连接上游服务器"
 
 
 def _record_and_call(tool_name: str, tool_args: dict) -> str:
